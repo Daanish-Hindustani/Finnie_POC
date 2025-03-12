@@ -20,12 +20,13 @@ class StockInfo(BaseModel):
 class Competitor(BaseModel):
     tickers: List[str]
 
+
 class CompetitorTool(BaseTool):
     name: str = "Stock Competitor Analysis Tool"
     description: str = "Analyzes a stock's sector and industry, finds competitors, and computes sector/industry averages."
     args_schema: Type[BaseModel] = CompetitorToolInput
-
-    def _run(self, stock_symbol: str) -> dict:
+    
+    def _run(self, stock_symbol) -> dict:
         info = yf.Ticker(stock_symbol).info
         sector = info.get('sector')
         industry = info.get('industry')
@@ -59,7 +60,7 @@ class CompetitorTool(BaseTool):
             messages=[
                 {
                     'role': 'user',
-                    'content': f'Given the industry:{industry} and sector:{sector} find 3 competitors of {stock_symbol}, Note: FB ticker is now META and TWT is now X',
+                    'content': f'Given the industry:{industry} and sector:{sector} find 3 competitors of {stock_symbol}, Note: FB ticker is now META. TWT ticker is now the symbol X',
                 }
             ],
             model='gemma2:2b',
