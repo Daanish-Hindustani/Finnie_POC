@@ -2,10 +2,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Type, List
 import yfinance as yf
-from ollama import chat
 from textblob import TextBlob
-import requests
-from bs4 import BeautifulSoup
 
 
 class SentimentToolInput(BaseModel):
@@ -19,115 +16,101 @@ class Info(BaseModel):
     context: List[str]
 
 
-class Competitor(BaseModel):
-    tickers: List[str]
-
-
 class SentimentToolOutput(BaseModel):
     main_stock_info: Info
     sector_stock_info: Info
     industry_stock_info: Info
 
 
-class IndustrySectorResponse(BaseModel):
-    sector: str = Field(...)
-    industry: str = Field(...)
-
-
-class NewScrapperLLMResponse(BaseModel):
-    news: List[str]
-
-
 class SentimentTool(BaseTool):
     name: str = "Sentiment Analysis Tool"
-    description: str = "Analyzes the sentiment a stock's sector and industry and the stock itself, finds news articles and calculates the sentiment."
+    description: str = (
+        "Analyzes the sentiment of a stock, its sector, and industry by gathering news articles and computing sentiment scores."
+    )
     args_schema: Type[BaseModel] = SentimentToolInput
 
     def _run(self, stock_symbol: str) -> SentimentToolOutput:
-        main_stock_news = self.getContextStock(stock_symbol)
-        main_stock_sentiment = self.getSentimentScore(main_stock_news)
-        main_stock_info = Info(id=stock_symbol, sentiment_score=main_stock_sentiment, context=main_stock_news)
+        try:
+            main_stock_news = self.get_context_stock(stock_symbol)
+            main_stock_sentiment = self.get_sentiment_score(main_stock_news)
+            main_stock_info = Info(id=stock_symbol, sentiment_score=main_stock_sentiment, context=main_stock_news)
 
-        # Get Industry and Sector
-        info = self.getIndustrySector(stock_symbol)
-        sector, industry = info
+            # Fetch industry and sector information
+            stock_info = yf.Ticker(stock_symbol).info
+            industry = stock_info.get('industry', 'Unknown Industry')
+            sector = stock_info.get('sector', 'Unknown Sector')
 
-        industry_news = self.getContextIndustry(industry)
-        industry_sentiment = self.getSentimentScore(industry_news)
-        industry_info = Info(id=industry, sentiment_score=industry_sentiment, context=industry_news)
+            # Industry sentiment
+            industry_context = self.get_context_industry(industry)
+            industry_sentiment = self.get_sentiment_score(industry_context)
+            industry_info = Info(id=industry, sentiment_score=industry_sentiment, context=industry_context)
 
-        sector_news = self.getContextSector(sector)
-        sector_sentiment = self.getSentimentScore(sector_news)
-        sector_info = Info(id=sector, sentiment_score=sector_sentiment, context=sector_news)
+            # Sector sentiment
+            sector_context = self.get_context_sector(sector)
+            sector_sentiment = self.get_sentiment_score(sector_context)
+            sector_info = Info(id=sector, sentiment_score=sector_sentiment, context=sector_context)
 
-        return SentimentToolOutput(
-            main_stock_info=main_stock_info,
-            sector_stock_info=sector_info,
-            industry_stock_info=industry_info
-        )
+            return dict(SentimentToolOutput(
+                main_stock_info=main_stock_info,
+                sector_stock_info=sector_info,
+                industry_stock_info=industry_info,
+            ))
+        except Exception as e:
+            print(f"Error in running SentimentTool: {e}")
+            return SentimentToolOutput(
+                main_stock_info=Info(id=stock_symbol, sentiment_score=0.0, context=[]),
+                sector_stock_info=Info(id="Unknown", sentiment_score=0.0, context=[]),
+                industry_stock_info=Info(id="Unknown", sentiment_score=0.0, context=[]),
+            )
 
-    def getSentimentScore(self, news: List[str]) -> float:
-        if not news:
+    def get_sentiment_score(self, news: List[str]) -> float:
+        try:
+            if not news:
+                return 0.0
+            return sum(TextBlob(content).sentiment.polarity for content in news) / len(news)
+        except Exception as e:
+            print(f"Error in sentiment analysis: {e}")
             return 0.0
-        score = sum(TextBlob(title).sentiment.polarity for title in news)
-        return score / len(news)
 
-    # Todo: add summary inplace of title
-    def getContextStock(self, stock_symbol: str) -> List[str]:
-        stock = yf.Ticker(stock_symbol)
-        if not stock.news:
+    def get_context_stock(self, stock_symbol: str) -> List[str]:
+        try:
+            stock = yf.Ticker(stock_symbol)
+            news = stock.get_news()
+            return [item["content"].get("summary", "") for item in news[:5]] if news else []
+        except Exception as e:
+            print(f"Error fetching stock news: {e}")
             return []
-        return [item["content"]["title"] for item in stock.news[:5]]
 
-    def getContextIndustry(self, industry: str) -> List[str]:
-        response = chat(
-            messages=[{
-                'role': 'user',
-                'content': f'Find the top 5 most relevant news titles for the industry: {industry} today.',
-            }],
-            model='gemma2:2b',
-            format=NewScrapperLLMResponse.model_json_schema()
-        )
+    def get_context_industry(self, industry: str) -> List[str]:
+        return self.get_industry_reports(industry)
 
+    def get_context_sector(self, sector: str) -> List[str]:
+        return self.get_sector_reports(sector)
+
+    def get_industry_reports(self, industry: str) -> List[str]:
         try:
-            news_response = NewScrapperLLMResponse.model_validate_json(response.message.content)
-            return news_response.news
+            formatted_industry = self.format_category(industry)
+            reports = yf.Industry(formatted_industry).research_reports
+            return [report.get('reportTitle', "") for report in reports] if reports else []
         except Exception as e:
-            return [f"Error parsing LLM response: {str(e)}"]
+            print(f"Error fetching industry reports for {industry}: {e}")
+            return []
 
-    def getContextSector(self, sector: str) -> List[str]:
-        response = chat(
-            messages=[{
-                'role': 'user',
-                'content': f'Find the top 5 most relevant news titles for the sector: {sector} today.',
-            }],
-            model='gemma2:2b',
-            format=NewScrapperLLMResponse.model_json_schema()
-        )
-
+    def get_sector_reports(self, sector: str) -> List[str]:
         try:
-            news_response = NewScrapperLLMResponse.model_validate_json(response.message.content)
-            return news_response.news
+            formatted_sector = self.format_category(sector)
+            reports = yf.Sector(formatted_sector).research_reports
+            return [report.get('reportTitle', "") for report in reports] if reports else []
         except Exception as e:
-            return [f"Error parsing LLM response: {str(e)}"]
+            print(f"Error fetching sector reports for {sector}: {e}")
+            return []
 
-    def getIndustrySector(self, stock_symbol: str) -> List[str]:
-        response = chat(
-            messages=[{
-                'role': 'user',
-                'content': f'Retrieve the industry and sector for the stock: {stock_symbol}.',
-            }],
-            model='gemma2:2b',
-            format=IndustrySectorResponse.model_json_schema()
-        )
+    def format_category(self, text: str) -> str:
+        if "-" not in text:
+            try:
+                return "-".join(word.lower() for word in text.split())
+            except Exception as e:
+                print(f"Error formatting category: {e}")
+                return "unknown"
+        return text
 
-        try:
-            info = IndustrySectorResponse.model_validate_json(response.message.content)
-            return [info.sector, info.industry]
-        except Exception as e:
-            return [f"Error retrieving sector: {str(e)}", "Unknown"]
-
-
-tool = SentimentTool()
-
-print(tool._run(stock_symbol = "GOOGL"))
