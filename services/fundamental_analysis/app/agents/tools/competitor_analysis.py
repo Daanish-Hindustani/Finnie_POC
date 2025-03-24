@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Type, List
 import yfinance as yf
 from ollama import chat
+import pandas as pd
 
 class CompetitorToolInput(BaseModel):
     """Input schema for StockCompetitorAnalysisTool."""
@@ -32,7 +33,7 @@ class CompetitorTool(BaseTool):
         industry = info.get('industry')
 
         main_stock_info = self.getStockInfo(stock_symbol)
-        competitors = self.getCompetitors(industry, sector, stock_symbol)
+        competitors = self.getCompetitors(industry, sector)
 
         results = {
             "main_stock": main_stock_info.model_dump(),
@@ -55,27 +56,26 @@ class CompetitorTool(BaseTool):
             eps_5year_forecast=str(info.get("earningsGrowth", "N/A")),
         )
 
-    def getCompetitors(self, industry: str, sector: str, stock_symbol: str) -> List[Competitor]:
-        response = chat(
-            messages=[
-                {
-                    'role': 'user',
-                    'content': f'Given the industry:{industry} and sector:{sector} find 3 competitors of {stock_symbol}, Note: FB ticker is now META. TWT ticker is now the symbol X',
-                }
-            ],
-            model='gemma2:2b',
-            format=Competitor.model_json_schema(),  # Pass schema for structured output
-        )
-
-        # Validate and parse the response into a Pydantic model
-        competitors = Competitor.model_validate_json(response.message.content)
-
-        # Convert the Pydantic model into a dictionary
-        competitors = competitors.model_dump()
+    def getCompetitors(self, industry: str, sector: str) -> List[Competitor]:
         
-        return competitors["tickers"]
+        industry_competitors = pd.DataFrame(yf.Industry(self.format_category(industry)).top_companies)
+        sector_competitors = yf.Sector(self.format_category(sector)).top_companies
+        industry_competitors = [key for key in industry_competitors['name'].to_dict().keys()]
+        sector_competitors = [key for key in sector_competitors['name'].to_dict().keys()]
+        
+        competitors = list(set(industry_competitors) | set(sector_competitors))
 
-
-# Example usage:
-c = CompetitorTool()
-print(c._run("GOOGL"))
+        return Competitor(tickers=competitors)
+    
+    def format_category(self, text: str) -> str:
+        if "-" not in text:
+            try:
+                res = []
+                for word in text.split():
+                    if word != "-" and word != "&":
+                        res.append(word.lower())
+                return "-".join(res)
+            except Exception as e:
+                print(f"Error formatting category: {e}")
+                return "unknown"
+        return text

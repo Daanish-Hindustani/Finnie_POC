@@ -108,7 +108,11 @@ class SentimentTool(BaseTool):
     def format_category(self, text: str) -> str:
         if "-" not in text:
             try:
-                return "-".join(word.lower() for word in text.split())
+                res = []
+                for word in text.split():
+                    if word != "-" and word != "&":
+                        res.append(word.lower())
+                return "-".join(res)
             except Exception as e:
                 print(f"Error formatting category: {e}")
                 return "unknown"
