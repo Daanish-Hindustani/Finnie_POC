@@ -2,7 +2,6 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 from typing import Type, List
 import yfinance as yf
-from ollama import chat
 import pandas as pd
 
 class CompetitorToolInput(BaseModel):
