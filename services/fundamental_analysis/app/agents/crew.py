@@ -1,10 +1,12 @@
 from crewai import Agent, Task, Crew, LLM
+from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
+from crewai_tools import BraveSearchTool
 
 
 
 def create_crew(stock_symbol):
     llm = LLM(
-        model="ollama/deepseek-r1:1.5b",
+        model="ollama/llama2:latest",
         base_url="http://localhost:11434"
     )
     
@@ -25,7 +27,7 @@ def create_crew(stock_symbol):
         role="Market Sentiment Analyst",
         goal="Analyze news articles, social media, and earnings call transcripts to gauge market sentiment on a stock.",
         backstory="You're an expert in financial sentiment analysis, skilled in identifying bullish and bearish trends from news, social media, and investor sentiment.",
-        #tools=[news_scraper, social_media_monitor, earnings_call_analyzer, sentiment_scoring_model],
+        #tools=[BraveSearchTool(), YahooFinanceNewsTool, news_scraper, social_media_monitor, earnings_call_analyzer, sentiment_scoring_model],
         llm=llm
     )
 
@@ -34,7 +36,7 @@ def create_crew(stock_symbol):
         role="Risk Assessment Specialist",
         goal="Evaluate the risks associated with a stock, including volatility, financial stability, and market conditions.",
         backstory="You're a highly skilled risk analyst with expertise in identifying financial, macroeconomic, and market risks that could impact investment decisions.",
-        #tools=[volatility_analyzer, debt_analysis_tool, market_risk_evaluator],
+        #tools=[BraveSearchTool(),volatility_analyzer, debt_analysis_tool, market_risk_evaluator],
         llm=llm
     )
 
@@ -52,7 +54,7 @@ def create_crew(stock_symbol):
         role="Macroeconomic & Industry Analyst",
         goal="Assess macroeconomic factors and industry trends that influence stock performance.",
         backstory="You're a macroeconomic strategist with expertise in economic indicators, sector performance, and global market trends.",
-        #tools=[economic_data_fetcher, industry_trend_analyzer, inflation_interest_rate_model],
+        #tools=[BraveSearchTool(), economic_data_fetcher, industry_trend_analyzer, inflation_interest_rate_model],
         llm=llm
     )
 
