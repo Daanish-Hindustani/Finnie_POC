@@ -57,14 +57,14 @@ class EarningsCallTool(BaseTool):
     def get_earning_report(self, stock_symbol: str) -> dict:
         """Get the full earnings report (income statement, balance sheet, cash flow)."""
         #income_statement = self.get_income_statement(stock_symbol)
-        #balance_sheet = self.get_balance_sheet(stock_symbol)
-        cash_flow_statement = self.get_cash_flow_statement(stock_symbol)
+        balance_sheet = self.get_balance_sheet(stock_symbol)
+        #cash_flow_statement = self.get_cash_flow_statement(stock_symbol)
 
         return {
             "stock_symbol": stock_symbol,
             #"income_statement": income_statement.dict(),
-            #"balance_sheet": balance_sheet.model_dump(),
-            "cash_flow_statement": cash_flow_statement
+            "balance_sheet": balance_sheet,
+            #"cash_flow_statement": cash_flow_statement
         }
 
     def get_income_statement(self, stock_symbol: str) -> IncomeStatement:
@@ -95,14 +95,24 @@ class EarningsCallTool(BaseTool):
     def get_balance_sheet(self, stock_symbol: str) -> BalanceSheet:
         """Fetch the balance sheet for the given stock."""
         ticker = yf.Ticker(stock_symbol)
-        balance_sheet_data = ticker.balance_sheet
+        balance_sheet_data = ticker.balance_sheet.to_dict()
+        balance_sheet_statments = {}
+        for date, data in balance_sheet_data.items():
+            formatted_date = str(date).split(" ")[0]
+            balance_sheet_statments[formatted_date] = self._parse_balance_sheet_item(data)
         
+        return balance_sheet_statments
+        
+        
+    
+    def _parse_balance_sheet_item(self, balance_sheet_data: Dict) -> BalanceSheet:
+        """Parse raw cash flow data into a structured CashFlowStatement."""
         return BalanceSheet(
-            total_assets=balance_sheet_data.loc['Total Assets'][0],
-            total_liabilities=balance_sheet_data.loc['Total Liabilities Net Minority Interest'][0],
-            total_equity=balance_sheet_data.loc['Total Equity Gross Minority Interest'][0],
-            current_assets=balance_sheet_data.loc['Total Current Assets'][0],
-            current_liabilities=balance_sheet_data.loc['Total Current Liabilities'][0]
+            total_assets=balance_sheet_data['Total Assets'],
+            total_liabilities=balance_sheet_data['Total Liabilities Net Minority Interest'],
+            total_equity=balance_sheet_data['Total Equity Gross Minority Interest'],
+            current_assets=balance_sheet_data['Current Assets'],
+            current_liabilities=balance_sheet_data['Current Liabilities']
         )
 
     def get_cash_flow_statement(self, stock_symbol: str) -> Dict[str, CashFlowStatement]:
