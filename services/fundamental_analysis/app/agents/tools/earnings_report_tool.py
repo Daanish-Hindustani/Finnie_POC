@@ -140,4 +140,3 @@ class EarningsCallTool(BaseTool):
             end_cash_position=cash_flow_data['End Cash Position']
         )
 
-print(EarningsCallTool()._run('GOOGL'))
