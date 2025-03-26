@@ -56,44 +56,43 @@ class EarningsCallTool(BaseTool):
 
     def get_earning_report(self, stock_symbol: str) -> dict:
         """Get the full earnings report (income statement, balance sheet, cash flow)."""
-        #income_statement = self.get_income_statement(stock_symbol)
+        income_statement = self.get_income_statement(stock_symbol)
         balance_sheet = self.get_balance_sheet(stock_symbol)
-        #cash_flow_statement = self.get_cash_flow_statement(stock_symbol)
+        cash_flow_statement = self.get_cash_flow_statement(stock_symbol)
 
         return {
             "stock_symbol": stock_symbol,
-            #"income_statement": income_statement.dict(),
+            "income_statement": income_statement,
             "balance_sheet": balance_sheet,
-            #"cash_flow_statement": cash_flow_statement
+            "cash_flow_statement": cash_flow_statement
         }
 
     def get_income_statement(self, stock_symbol: str) -> IncomeStatement:
         """Fetch the income statement for the given stock."""
         ticker = yf.Ticker(stock_symbol)
         income_statement_data = ticker.financials.to_dict()
-        print(income_statement_data)
-        # Safely fetch the values using .iloc() for positional access
-        try:
-            total_revenue = income_statement_data.loc['Total Revenue'].iloc[0] if 'Total Revenue' in income_statement_data.index else None
-            gross_profit = income_statement_data.loc['Gross Profit'].iloc[0] if 'Gross Profit' in income_statement_data.index else None
-            operating_income = income_statement_data.loc['Operating Income'].iloc[0] if 'Operating Income' in income_statement_data.index else None
-            net_income = income_statement_data.loc['Net Income'].iloc[0] if 'Net Income' in income_statement_data.index else None
-            cost_of_revenue = income_statement_data.loc['Cost of Revenue'].iloc[0] if 'Cost of Revenue' in income_statement_data.index else None
-            
-            return IncomeStatement(
-                total_revenue=total_revenue,
-                gross_profit=gross_profit,
-                operating_income=operating_income,
-                net_income=net_income,
-                cost_of_revenue=cost_of_revenue
-            )
-        except KeyError as e:
-            return {"error": f"Missing data in income statement: {str(e)}"}
-        except Exception as e:
-            return {"error": f"Error fetching income statement: {str(e)}"}
+        income_statement_statments = {}
+        for date, data in income_statement_data.items():
+            formatted_date = str(date).split(" ")[0]
+            income_statement_statments[formatted_date] = self._parse_income_statement_item(data)
+        
+        return income_statement_statments
+        
+    
+
+    def _parse_income_statement_item(self, income_statement_data: Dict) -> IncomeStatement:
+        return IncomeStatement(
+            total_revenue = income_statement_data['Total Revenue'],
+            gross_profit = income_statement_data['Gross Profit'],
+            operating_income = income_statement_data['Operating Income'],
+            net_income = income_statement_data['Net Income'],
+            cost_of_revenue = income_statement_data['Cost Of Revenue'],
+        )
+
+
 
     def get_balance_sheet(self, stock_symbol: str) -> BalanceSheet:
-        """Fetch the balance sheet for the given stock."""
+        
         ticker = yf.Ticker(stock_symbol)
         balance_sheet_data = ticker.balance_sheet.to_dict()
         balance_sheet_statments = {}
@@ -106,7 +105,7 @@ class EarningsCallTool(BaseTool):
         
     
     def _parse_balance_sheet_item(self, balance_sheet_data: Dict) -> BalanceSheet:
-        """Parse raw cash flow data into a structured CashFlowStatement."""
+        
         return BalanceSheet(
             total_assets=balance_sheet_data['Total Assets'],
             total_liabilities=balance_sheet_data['Total Liabilities Net Minority Interest'],
