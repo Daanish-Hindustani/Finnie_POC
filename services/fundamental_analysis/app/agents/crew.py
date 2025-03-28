@@ -1,74 +1,73 @@
 from crewai import Agent, Task, Crew, LLM
-from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
-from crewai_tools import BraveSearchTool
-
-
+# from langchain_community.tools.yahoo_finance_news import YahooFinanceNewsTool
+from crewai_tools import SerperDevTool
+from dotenv import load_dotenv
+from tools import competitor_analysis, earnings_report_tool, risk_analysis_tool, sentiment_tools, technical_analysis_tool
+load_dotenv()
 
 def create_crew(stock_symbol):
     llm = LLM(
-        model="ollama/llama2:latest",
+        model="ollama/gemma2:2b",
         base_url="http://localhost:11434"
     )
     
-    #Agents
+    # Agents
     
-    #Analyst
+    # Analyst
     analyst = Agent(
         role="Financial Analyst",
         goal="Interpret gathered stock data to provide actionable investment insights and recommendations.",
         backstory="You're a seasoned financial analyst known for making accurate market predictions by synthesizing complex financial data, intrinsic value, industry trends, and company fundamentals.",
-        #tools=[yf_tech_analysis, yf_fundamental_analysis, competitor_analysis],
+        tools=[competitor_analysis.CompetitorTool(), earnings_report_tool.EarningsCallTool(), risk_analysis_tool.RiskTool()],
         llm=llm
     )
 
-
-    #Sentiment
+    # Sentiment
     sentiment = Agent(
         role="Market Sentiment Analyst",
         goal="Analyze news articles, social media, and earnings call transcripts to gauge market sentiment on a stock.",
         backstory="You're an expert in financial sentiment analysis, skilled in identifying bullish and bearish trends from news, social media, and investor sentiment.",
-        #tools=[BraveSearchTool(), YahooFinanceNewsTool, news_scraper, social_media_monitor, earnings_call_analyzer, sentiment_scoring_model],
+        tools=[SerperDevTool(), sentiment_tools.SentimentTool()],
         llm=llm
     )
 
-
+    # Risk Assessor
     risk_assessor = Agent(
         role="Risk Assessment Specialist",
         goal="Evaluate the risks associated with a stock, including volatility, financial stability, and market conditions.",
         backstory="You're a highly skilled risk analyst with expertise in identifying financial, macroeconomic, and market risks that could impact investment decisions.",
-        #tools=[BraveSearchTool(),volatility_analyzer, debt_analysis_tool, market_risk_evaluator],
+        tools=[risk_analysis_tool.RiskTool()],
         llm=llm
     )
 
-
+    # Insider Trading Analyst
     insider_trading_analyst = Agent(
         role="Insider & Institutional Trading Analyst",
         goal="Analyze insider transactions and institutional investments to assess market confidence in a stock.",
         backstory="You're a market expert skilled in tracking insider trades and institutional investments to gauge investor confidence.",
-        #tools=[insider_trading_tracker, hedge_fund_activity_scraper, sec_filings_analyzer],
+        tools=[SerperDevTool()],
         llm=llm
     )
 
-
+    # Macroeconomic & Industry Analyst
     macro_industry_analyst = Agent(
         role="Macroeconomic & Industry Analyst",
         goal="Assess macroeconomic factors and industry trends that influence stock performance.",
         backstory="You're a macroeconomic strategist with expertise in economic indicators, sector performance, and global market trends.",
-        #tools=[BraveSearchTool(), economic_data_fetcher, industry_trend_analyzer, inflation_interest_rate_model],
+        tools=[SerperDevTool()],
         llm=llm
     )
 
-
+    # Technical Analyst
     technical_analyst = Agent(
         role="Technical Analyst",
         goal="Analyze stock price movements, chart patterns, and indicators to identify trading opportunities.",
         backstory="You're a technical analysis expert skilled in identifying market trends using chart patterns, indicators, and historical price data.",
-        #tools=[price_trend_analyzer, moving_average_tool, rsi_macd_indicator],
+        tools=[technical_analysis_tool.TechnicalAnalysis()],
         llm=llm
     )
 
-
-    #Tasks
+    # Tasks
 
     # Analyst Task
     analyst_task = Task(
@@ -112,7 +111,7 @@ def create_crew(stock_symbol):
         agent=technical_analyst
     )
 
-    #Final Desison
+    # Final Decision Task
     final_decision_task = Task(
         description="Compile insights from sentiment analysis, risk assessment, insider trading, macroeconomic trends, and technical analysis to provide a final investment recommendation.",
         expected_output="A comprehensive investment report summarizing all analyses, with a final buy, hold, or sell recommendation.",
@@ -123,7 +122,7 @@ def create_crew(stock_symbol):
     crew = Crew(
         agents=[analyst, sentiment, risk_assessor],
         tasks=[sentiment_task, risk_task, final_decision_task],
-        process="sequential"  
+        process="sequential"
     )
 
     return crew

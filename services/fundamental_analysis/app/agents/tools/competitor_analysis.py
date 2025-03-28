@@ -32,11 +32,12 @@ class CompetitorTool(BaseTool):
         industry = info.get('industry')
 
         main_stock_info = self.getStockInfo(stock_symbol)
-        competitors = self.getCompetitors(industry, sector)
+        competitors = self.getCompetitors(industry, sector).tickers
+        
 
         results = {
-            "main_stock": main_stock_info.model_dump(),
-            "competitors": [self.getStockInfo(c).model_dump() for c in competitors]
+            "main_stock": main_stock_info,
+            "competitors": [self.getStockInfo(c) for c in competitors[:5]]
         }
 
         return results

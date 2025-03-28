@@ -35,7 +35,6 @@ class RiskTool(BaseTool):
     def fetch_stock_data(self, stock_symbol: str) -> pd.DataFrame:
         """Fetch historical stock data."""
         stock_data = yf.download(stock_symbol, period="1y", interval="1d")
-        print(stock_data)
         stock_data['Daily Return'] = stock_data['Close'].pct_change()
         return stock_data
 
@@ -58,4 +57,3 @@ class RiskTool(BaseTool):
         return beta
 
 
-print(RiskTool()._run("GOOGL"))

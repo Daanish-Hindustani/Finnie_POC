@@ -81,4 +81,3 @@ class TechnicalAnalysis(BaseTool):
             "lower_band": round(lower_band.iloc[-1], 2)
         }
 
-print(TechnicalAnalysis()._run("GOOGL"))
